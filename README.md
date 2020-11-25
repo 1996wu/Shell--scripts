@@ -1,2 +1,2 @@
 # Shell--scripts
-This is a shell script commonly used in Gaussian software calculations
+There are  shell scripts commonly used in Gaussian software calculations
