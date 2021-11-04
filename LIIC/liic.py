@@ -1,17 +1,21 @@
 #!/usr/bin/env python
-import pandas as pd
-import numpy as np
+# -*- coding: utf-8 -*-
+
 import os
+import re
 import shutil
 import sys
-import re
 from itertools import islice
+
+import numpy as np
+import pandas as pd
 
 """
 This script is a linear interpolation between the two types of coordinates.
 Meanwhile, Cartesian coordinates or internal coordinates can be given.
 author: wuzb_1996@outlook.com 
 """
+
 
 def rodrigues_rotation(axis, angle, vector):
     angle = np.radians(angle)
@@ -23,12 +27,26 @@ def rodrigues_rotation(axis, angle, vector):
 
 
 def zmatrix_to_cartesian(atom, value, zmatrix):
+    # the format of zmatrix : List(str)
+    # C              
+    # C                  1            B1
+    # C                  2            B2    1            A1
+    # C                  3            B3    2            A2      1        D1
+    # ....
+    # value :List(float)
+    # B1 = .....
+    # B2 = .....
+    # .......
+    # A1 = .....
+    # A2 = .....
+    # ........
+    # D1 = .....
+    # D2 = .....
     coord = []
     distance = 0.0
     angle = 0.0
     dihedral = 0.0
     for i in range(atom):
-        xyz = []
         if i >= 1:
             distance = value[i-1]
             if i >= 2:
@@ -86,14 +104,12 @@ def read_zmatrix(file, file_1):
 
 
 def main():
-    if os.path.exists('begin.gjf') and os.path.exists('end.gjf'):
-        True
-    else:
-        print('begin.gj for end.gjf does not exist')
+    if not (os.path.exists(begin) and os.path.exists(end)):
+        print(f'The file {begin} or {end} do not exist')
         sys.exit(1)
     # 读取gjf 格式内坐标内容
     l = -1
-    with open('Gauss', 'w+') as Gauss, open('end.gjf', 'r') as A:
+    with open('Gauss', 'w+') as Gauss, open(end, 'r') as A:
         for line in A:
             l += 1
             Lines = line.lstrip()
@@ -115,7 +131,7 @@ def main():
     data_begin = pd.read_csv('begin.txt', names=name_begin, sep='\s+')
     data_end = pd.read_csv('end.txt', names=name_end, sep='\s+')
     data = pd.merge(data_begin, data_end).set_index(
-        ['key'])  
+        ['key'])
     data['Delta'] = (data['end'] - data['begin'])/18  # 计算差分18次内坐标的Delta
 
     def adj(i):
@@ -159,7 +175,7 @@ def main():
 
     Columns = data.columns.drop(
         ['begin', 'end', 'Delta'])  # 丢弃begin end Delta 三列
-    for C in Columns:  # Columns = [1,2...,N]
+    for count, C in enumerate(Columns):  # Columns = [1,2...,N]
         i_str = str(C)
         head = i_str + '.gjf'
         tail = i_str + '.txt'
@@ -168,11 +184,11 @@ def main():
             data[C].to_csv(tail, header=False, sep=" ",
                            float_format='%.8f')  # 读取每列数据
         else:
-            natom, zmatrix = read_zmatrix('end.gjf', 'Gauss')
+            natom, zmatrix = read_zmatrix(end, 'Gauss')
             shutil.copy('Gauss', head)
             cartesian = zmatrix_to_cartesian(natom, data[C], zmatrix)
             with open(tail, 'w+') as file, open('simulation.xyz', 'a+') as file_1:
-                file_1.write(str(natom)+'\n'+'This is test'+'\n')
+                file_1.write(str(natom)+'\n' + f'Time {str(count):>5s}'+'\n')
                 for i in range(natom):
                     line = format(
                         zmatrix[i][0], '5s')+''.join(format(x, '>18.8f') for x in cartesian[i])
@@ -184,8 +200,8 @@ def main():
             f_1.write(f_2.read())
         os.remove(tail)
 
-    R = ['begin.txt', 'Gauss', 'end.txt']  # 删除临时文件
-    for i in R:
+    # 删除临时文件
+    for i in ['begin.txt', 'Gauss', 'end.txt']: 
         os.remove(i)
 
     # print(data_re)
@@ -201,9 +217,11 @@ def main():
 
 
 if __name__ == '__main__':
-    direction = True  # 两种旋转不同方向
-    Num_inter = 13 # 差分次数
+    direction = True  # 两种旋转不同方向 "True or False"
+    Num_inter = 18  # 差分次数
     Num_begin = 0  # 起始编号
     Num_coef = 1  # 编号系数( 文件编号：a+bx  (a-> 起始编号，b->差分次数 ,x 编号系数)
     flag_Z_C = True  # zmatrix->cartesian
+    begin = 'begin.gjf' # 初始构型
+    end = 'end.gjf' #结束构型
     main()
