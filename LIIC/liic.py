@@ -11,7 +11,7 @@ import pandas as pd
 """
 This script is a linear interpolation between the two types of coordinates.
 Meanwhile, Cartesian coordinates or internal coordinates can be given.
-author: wuzb_1996@outlook.com 
+author: zbwu1996@gmail.com
 """
 
 def coord_rot(coord1, coord2):
@@ -278,8 +278,8 @@ if __name__ == '__main__':
     Num_begin = 0  # 起始编号
     Num_coef = 1  # 编号系数( 文件编号：a+bx  (a-> 起始编号，b->差分次数 ,x 编号系数)
     flag_Z_C = True  # zmatrix->cartesian
-    begin = 'Np-Fu.gjf' # 初始构型
-    end = 'Np-Fu-S1S0.gjf' #结束构型
+    begin = 'begin.gjf' # 初始构型
+    end = 'end.gjf' #结束构型
     flag_remove = True # 是否移除文件"simulation.xyz"
     refer = None   # 初始构型未转化为Z坐标后的笛卡尔坐标
     main()
