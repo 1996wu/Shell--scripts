@@ -33,9 +33,9 @@ function replace_coordinate {
 #  $1 natom  $2 ntime $3 old_file $4 new_file
 
 
-template="tmp.gjf"
+template="tmp.inp"
 suffix=${template##*.}
-l=0
+
 
 natom=$(grep -E "[0-9]*" -o -m 1 simulation.xyz)
 ntime=$(grep "" -c simulation.xyz | awk '{print (int ($0 / ("'"${natom}"'" + 2)) ) }')
@@ -54,11 +54,17 @@ if [ "${N_tmp}" -ne "${natom}" ];then
   exit 1
 fi
 
-
+k=0
+l=0 # read l time geom from 'simulation.xyz'
 while [ "${ntime}" -gt "${l}" ]
 do 
-    new_file="${l}${suffix}" 
+	new_file="${k}.${suffix}" 
     replace_coordinate "$natom" "${l}" "${template}" "${new_file}"
-    g16 "${new_file}" # running software
-    l=$((l+1))
+    #g16 "${new_file}" # running software
+    sh bdf_template.sh "${new_file}" > "${k}".log
+    if [ "$((l+1))" -gt "${ntime}"  ];then 
+        cp "${k}.scforb" "$((k+1)).scforb"
+    fi 
+	l=$((l+1))
+	k=$((k+1))
 done 
