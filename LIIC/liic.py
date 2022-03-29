@@ -1,11 +1,9 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-
 import os
 import re
 import shutil
 import sys
 from itertools import islice
+import copy 
 
 import numpy as np
 import pandas as pd
@@ -15,6 +13,31 @@ This script is a linear interpolation between the two types of coordinates.
 Meanwhile, Cartesian coordinates or internal coordinates can be given.
 author: wuzb_1996@outlook.com 
 """
+
+def coord_rot(coord1, coord2):
+    """
+    url=https://en.wikipedia.org/wiki/Kabsch_algorithm
+    """
+    # natom = len(coord1)
+    coord_1 = copy.deepcopy(coord1)
+    coord_2 = copy.deepcopy(coord2)
+    coord_1 -= np.mean(coord_1, axis=0)
+    coord_2 -= np.mean(coord_2, axis=0)
+    cov_matrix = coord_1.T @ coord_2
+    U, sigma, VT = np.linalg.svd(cov_matrix)
+    d = np.sign(np.linalg.det(U @ VT))
+    diag = np.identity(3)
+    diag[2][2] = d
+    rot_mat = VT.T @ diag @ U.T
+    # rot_coord = coord_2 @ rot_matrix
+    # RMSD = np.sqrt(np.sum((coord_1 - rot_coord) ** 2) / natom)
+    return rot_mat
+
+def translation(geom1, geom2):
+    rot_mat = coord_rot(geom1, geom2)
+    trans_mat =  geom1 - geom2 @ rot_mat
+    return rot_mat, trans_mat
+
 
 
 def rodrigues_rotation(axis, angle, vector):
@@ -76,6 +99,15 @@ def zmatrix_to_cartesian(atom, value, zmatrix):
         coord.append(xyz)
     return coord
 
+def get_geom(filename):
+    with open(filename, 'r') as f:
+        regex = re.compile('[A-Za-z]{1,2}\s*(\s*(-?[0-9]+\.[0-9]*)){3}')
+        geom = []
+        for line in f:
+            if regex.search(line):
+                xyz = list(map(float, line.split()[1:4]))
+                geom.append(xyz)
+        return np.array(geom)
 
 def read_zmatrix(file, file_1):
     # file ->end.gjf file_1 = Gauss
@@ -119,8 +151,10 @@ def main():
                 break
 
     # 从第l+1行读取内坐标数据,保存为end.txt 和begin.txt
-    for i in ['end', 'begin']:
-        suffix_txt = str(i) + '.txt'
+    tmp_file = [os.path.splitext(i)[0] for i in [begin, end]]
+    file = ['begin', 'end']
+    for i,j in zip(tmp_file,file):
+        suffix_txt = str(j) + '.txt'
         suffix_gjf = str(i) + '.gjf'
         with open(suffix_txt, 'w+') as txt, open(suffix_gjf, 'r') as gjf:
             for index, line in enumerate(islice(gjf, l, None)):
@@ -175,6 +209,20 @@ def main():
 
     Columns = data.columns.drop(
         ['begin', 'end', 'Delta'])  # 丢弃begin end Delta 三列
+    
+    if flag_remove:
+        if os.path.exists("simulation.xyz"):
+            print("The file 'simulation.xyz' exist and will be remove")
+            os.remove("simulation.xyz")
+    
+    refer_geom = None
+    if refer:
+        if not os.path.exists(refer):
+            raise Exception("The refer cartesian file %s does not exist" %(refer))
+        else:
+            refer_geom = get_geom(refer)
+    
+
     for count, C in enumerate(Columns):  # Columns = [1,2...,N]
         i_str = str(C)
         head = i_str + '.gjf'
@@ -187,6 +235,14 @@ def main():
             natom, zmatrix = read_zmatrix(end, 'Gauss')
             shutil.copy('Gauss', head)
             cartesian = zmatrix_to_cartesian(natom, data[C], zmatrix)
+            
+            if count == 0 and refer_geom:
+                basis_geom = np.array(cartesian)
+                rot_mat, trans_mat = translation(refer_geom, basis_geom)
+            if refer_geom:
+                # 调整分子趋向，与参考分子趋向一致。
+                cartesian = np.array(cartesian) @ rot_mat + trans_mat
+            
             with open(tail, 'w+') as file, open('simulation.xyz', 'a+') as file_1:
                 file_1.write(str(natom)+'\n' + f'Time {str(count):>5s}'+'\n')
                 for i in range(natom):
@@ -222,6 +278,8 @@ if __name__ == '__main__':
     Num_begin = 0  # 起始编号
     Num_coef = 1  # 编号系数( 文件编号：a+bx  (a-> 起始编号，b->差分次数 ,x 编号系数)
     flag_Z_C = True  # zmatrix->cartesian
-    begin = 'begin.gjf' # 初始构型
-    end = 'end.gjf' #结束构型
+    begin = 'Np-Fu.gjf' # 初始构型
+    end = 'Np-Fu-S1S0.gjf' #结束构型
+    flag_remove = True # 是否移除文件"simulation.xyz"
+    refer = None   # 初始构型未转化为Z坐标后的笛卡尔坐标
     main()
